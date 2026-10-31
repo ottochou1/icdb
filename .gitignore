@@ -1,0 +1,18 @@
+/config.php
+/install.lock
+/.user.ini
+/maintenance-state.php
+/maintenance-state.php.*
+/.maintenance-*
+/uploads/*
+!/uploads/index.html
+!/uploads/verify/
+/uploads/verify/*
+!/uploads/verify/index.html
+!/uploads/verify/.htaccess
+*.log
+.env
+.env.*
+
+# 演示账号和内容数据
+/modules/seed.json
