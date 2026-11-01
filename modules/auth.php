@@ -63,6 +63,9 @@ function h_auth_login()
     if (!$row || !password_verify($password, $row['password_hash'])) {
         throw new ApiException('邮箱或密码不正确', 401);
     }
+    if (maintenance_mode() && empty($row['is_admin'])) {
+        throw new ApiException('站点正在闭站维护，目前仅管理员可以登录', 403, 'MAINTENANCE');
+    }
     auth_start_session($row['id']);
     return ['user' => public_user($row, true)];
 }
@@ -80,7 +83,14 @@ function h_auth_logout()
 function h_auth_me()
 {
     $user = current_user();
-    return ['user' => $user ? public_user($user, true) : null];
+    $maintenance = maintenance_mode();
+    if ($maintenance && $user && empty($user['is_admin'])) {
+        $user = null;
+    }
+    return [
+        'user' => $user ? public_user($user, true) : null,
+        'maintenanceMode' => $maintenance,
+    ];
 }
 
 function h_auth_profile()

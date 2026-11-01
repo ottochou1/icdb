@@ -1,6 +1,6 @@
-import { api, qsOf } from '../api.js?v=maintenance-1';
+import { api, qsOf } from '../api.js';
 import { esc, timeAgo, toast, avatarHTML, emptyHTML, pagerHTML } from '../util.js';
-import { session, reload } from '../session.js';
+import { session, reload, setMaintenanceMode } from '../session.js';
 
 const STATUS_TEXT = { pending: '待审核', approved: '已通过', rejected: '未通过' };
 
@@ -45,6 +45,7 @@ function userRowHTML(u) {
           <b>${esc(u.nickname)}</b>
           ${u.isAdmin ? '<span class="status-tag admin">管理员</span>' : ''}
           ${u.verified ? '<span class="verified-tag">在读认证</span>' : '<span class="small muted">未认证</span>'}
+          ${u.canUploadCourses ? '<span class="status-tag approved">可上传课程</span>' : ''}
           ${u.banned ? '<span class="status-tag rejected">已封禁</span>' : ''}
         </div>
         <div class="small muted">${esc(u.email)} · 注册 ${timeAgo(u.joinedAt)}${u.banReason ? ` · 原因：${esc(u.banReason)}` : ''}</div>
@@ -52,8 +53,29 @@ function userRowHTML(u) {
       <div class="admin-actions">
         <button class="btn btn-sm" data-toggle-admin="${esc(u.id)}" data-value="${u.isAdmin ? '0' : '1'}">${u.isAdmin ? '取消管理员' : '设为管理员'}</button>
         <button class="btn btn-sm" data-toggle-verify="${esc(u.id)}" data-value="${u.verified ? '0' : '1'}">${u.verified ? '取消认证' : '标记已认证'}</button>
+        ${u.isAdmin
+          ? '<span class="small muted">管理员默认可上传</span>'
+          : `<button class="btn btn-sm" data-toggle-upload="${esc(u.id)}" data-value="${u.canUploadCourses ? '0' : '1'}">${u.canUploadCourses ? '收回上传权限' : '授予上传权限'}</button>`}
         <button class="btn btn-sm btn-danger" data-toggle-ban="${esc(u.id)}" data-value="${u.banned ? '0' : '1'}">${u.banned ? '解除封禁' : '封禁'}</button>
       </div>
+    </div>`;
+}
+
+function settingsTabHTML(data) {
+  const enabled = !!data.maintenanceMode;
+  return `
+    <div class="notice ${enabled ? 'error' : 'ok'}">
+      <b>${enabled ? '闭站维护已开启' : '站点正常开放'}</b>
+      <div class="small" style="margin-top:6px">
+        ${enabled
+          ? '非管理员会被强制引导到登录页，普通账号无法登录，所有业务接口也会拒绝访问。管理员仍可正常浏览和管理站点。'
+          : '所有访客可正常浏览，已登录用户按各自权限使用功能。'}
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn ${enabled ? '' : 'btn-danger'}" id="maintenance-toggle" data-enabled="${enabled ? '0' : '1'}">
+        ${enabled ? '关闭闭站维护，恢复开放' : '开启闭站维护'}
+      </button>
     </div>`;
 }
 
@@ -390,15 +412,7 @@ export async function renderAdmin(params) {
   const keyword = params.get('q') || '';
   let body = '';
 
-  if (tab === 'settings') {
-    const state = await api.adminMaintenance();
-    body = `<form id="maintenance-form"><h3>闭站维护</h3>
-      <p class="muted">开启后，普通访客只能看到维护提示，业务接口暂停访问。管理员仍可登录后台操作。</p>
-      <div class="notice ${state.enabled ? 'pending' : 'ok'}">当前状态：${state.enabled ? '维护中' : '正常开放'}</div>
-      <div class="field" style="margin-top:16px"><label><input type="checkbox" name="enabled" ${state.enabled ? 'checked' : ''}> 开启维护模式</label></div>
-      <div class="field"><label for="maintenance-message">访客提示</label><textarea id="maintenance-message" name="message" maxlength="300">${esc(state.message)}</textarea></div>
-      <button class="btn btn-primary" type="submit">保存设置</button><p class="small muted" role="status" id="maintenance-result"></p></form>`;
-  } else if (tab === 'verify') {
+  if (tab === 'verify') {
     const data = await api.adminVerifications(status);
     const items = data.items || [];
     body = `
@@ -420,6 +434,8 @@ export async function renderAdmin(params) {
       </form>
       ${data.items.length ? `<div class="admin-list">${data.items.map(userRowHTML).join('')}</div>` : emptyHTML('没有匹配的用户')}
       ${pagerHTML(data.page, Math.ceil(data.total / data.pageSize))}`;
+  } else if (tab === 'settings') {
+    body = settingsTabHTML(await api.adminMaintenance());
   } else if (tab === 'courses') {
     const category = params.get('category') || '';
     const college = params.get('college') || '';
@@ -480,15 +496,17 @@ export async function renderAdmin(params) {
           <span>短评 <b>${stats.reviews}</b></span>
           <span>帖子 <b>${stats.posts}</b></span>
           <span>封禁 <b>${stats.banned}</b></span>
+          <span>课程上传者 <b>${stats.courseUploaders}</b></span>
+          ${stats.maintenanceMode ? '<span class="status-tag rejected">闭站维护中</span>' : ''}
         </div>` : ''}
         <div class="tabs">
-          <a class="tab ${tab === 'settings' ? 'active' : ''}" href="#/admin?tab=settings">网站设置</a>
           <a class="tab ${tab === 'verify' ? 'active' : ''}" href="#/admin?tab=verify">认证审核</a>
           <a class="tab ${tab === 'users' ? 'active' : ''}" href="#/admin?tab=users">用户管理</a>
           <a class="tab ${tab === 'content' ? 'active' : ''}" href="#/admin?tab=content">内容管理</a>
           <a class="tab ${tab === 'courses' ? 'active' : ''}" href="#/admin?tab=courses">课程管理</a>
           <a class="tab ${tab === 'import' ? 'active' : ''}" href="#/admin?tab=import">课程导入</a>
           <a class="tab ${tab === 'edu' ? 'active' : ''}" href="#/admin?tab=edu">教务表格导入</a>
+          <a class="tab ${tab === 'settings' ? 'active' : ''}" href="#/admin?tab=settings">站点设置</a>
         </div>
         <div class="divider"></div>
         ${body}
@@ -502,22 +520,6 @@ export async function renderAdmin(params) {
 }
 
 export function mountAdmin(root, params) {
-  root.querySelector('#maintenance-form')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const button = form.querySelector('button[type="submit"]');
-    const enabled = form.elements.enabled.checked;
-    if (enabled && !window.confirm('开启维护后普通用户将无法访问网站，管理员仍可使用后台。确认保存？')) return;
-    button.disabled = true;
-    try {
-      await api.updateMaintenance({ enabled, message: form.elements.message.value });
-      toast(enabled ? '维护模式已开启' : '网站已恢复开放', 'ok');
-      reload();
-    } catch (err) {
-      root.querySelector('#maintenance-result').textContent = err.message;
-      toast(err.message, 'error');
-    } finally { button.disabled = false; }
-  });
   root.querySelectorAll('[data-approve]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-approve');
@@ -547,16 +549,18 @@ export function mountAdmin(root, params) {
     });
   });
 
-  root.querySelectorAll('[data-toggle-admin], [data-toggle-verify], [data-toggle-ban]').forEach((btn) => {
+  root.querySelectorAll('[data-toggle-admin], [data-toggle-verify], [data-toggle-upload], [data-toggle-ban]').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-toggle-admin') || btn.getAttribute('data-toggle-verify') || btn.getAttribute('data-toggle-ban');
+      const id = btn.getAttribute('data-toggle-admin') || btn.getAttribute('data-toggle-verify') || btn.getAttribute('data-toggle-upload') || btn.getAttribute('data-toggle-ban');
       const isBan = btn.hasAttribute('data-toggle-ban');
       const value = btn.getAttribute('data-value') === '1';
       const patch = isBan
         ? { banned: value }
         : btn.hasAttribute('data-toggle-admin')
           ? { isAdmin: value }
-          : { verified: value };
+          : btn.hasAttribute('data-toggle-upload')
+            ? { canUploadCourses: value }
+            : { verified: value };
 
       if (isBan && value) {
         const reason = window.prompt('封禁原因（会展示给该用户）：', '违反社区规范');
@@ -575,6 +579,22 @@ export function mountAdmin(root, params) {
         toast(err.message, 'error');
       }
     });
+  });
+
+  root.querySelector('#maintenance-toggle')?.addEventListener('click', async (e) => {
+    const enabled = e.currentTarget.getAttribute('data-enabled') === '1';
+    const message = enabled
+      ? '确认开启闭站维护？开启后只有管理员可以登录和访问站点。'
+      : '确认关闭闭站维护并恢复对外开放？';
+    if (!window.confirm(message)) return;
+    try {
+      const data = await api.adminMaintenanceUpdate(enabled);
+      setMaintenanceMode(data.maintenanceMode);
+      toast(enabled ? '闭站维护已开启' : '站点已恢复开放', 'ok');
+      reload();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   });
 
   root.querySelectorAll('[data-del-id]').forEach((btn) => {

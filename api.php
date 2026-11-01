@@ -4,7 +4,6 @@
  * 需要 PHP 7.4+ / PDO MySQL
  */
 require_once __DIR__ . '/lib.php';
-require_once __DIR__ . '/maintenance.php';
 require_once __DIR__ . '/modules/auth.php';
 require_once __DIR__ . '/modules/courses.php';
 require_once __DIR__ . '/modules/posts.php';
@@ -14,9 +13,6 @@ require_once __DIR__ . '/modules/messages.php';
 require_once __DIR__ . '/modules/admin.php';
 
 $routes = [
-    'maintenance.status' => 'h_maintenance_status',
-    'admin.maintenance' => 'h_admin_maintenance',
-    'admin.maintenance.update' => 'h_admin_maintenance_update',
     'config' => 'h_config',
     'home' => 'h_home',
 
@@ -85,6 +81,22 @@ $routes = [
     'admin.course.merge' => 'h_admin_course_merge',
     'admin.courses.import' => 'h_admin_courses_import',
     'admin.edu.import' => 'h_admin_edu_import',
+    'admin.maintenance' => 'h_admin_maintenance',
+    'admin.maintenance.update' => 'h_admin_maintenance_update',
+];
+
+// 未列出的接口默认只允许 GET；所有写接口显式限定方法，避免通过 GET 链接触发状态变更。
+$routeMethods = [
+    'auth.register' => 'POST', 'auth.login' => 'POST', 'auth.logout' => 'POST', 'auth.profile' => 'POST',
+    'courses.create' => 'POST', 'courses.update' => 'POST', 'courses.delete' => 'DELETE', 'courses.import' => 'POST',
+    'reviews.create' => 'POST', 'reviews.update' => 'POST', 'reviews.delete' => 'DELETE', 'reviews.like' => 'POST',
+    'posts.create' => 'POST', 'posts.update' => 'POST', 'posts.delete' => 'DELETE', 'posts.like' => 'POST',
+    'comments.create' => 'POST', 'comments.delete' => 'DELETE', 'comments.like' => 'POST',
+    'verify.submit' => 'POST', 'verify.cancel' => 'POST',
+    'messages.send' => 'POST', 'messages.read' => 'POST', 'notifications.read' => 'POST',
+    'admin.verification.review' => 'POST', 'admin.user.update' => 'POST', 'admin.content.delete' => 'POST',
+    'admin.course.update' => 'POST', 'admin.course.delete' => 'POST', 'admin.course.merge' => 'POST',
+    'admin.courses.import' => 'POST', 'admin.edu.import' => 'POST', 'admin.maintenance.update' => 'POST',
 ];
 
 $route = isset($_GET['r']) ? trim((string) $_GET['r']) : '';
@@ -96,7 +108,20 @@ try {
     if (!isset($routes[$route]) || !function_exists($routes[$route])) {
         throw new ApiException('接口不存在', 404);
     }
-    maintenance_guard($route);
+    $allowedMethod = isset($routeMethods[$route]) ? $routeMethods[$route] : 'GET';
+    $requestMethod = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
+    if ($requestMethod !== $allowedMethod) {
+        header('Allow: ' . $allowedMethod);
+        throw new ApiException('请求方法不被允许', 405, 'METHOD_NOT_ALLOWED');
+    }
+
+    // 闭站维护期间只保留登录态检查、管理员登录和退出；其余接口仅管理员可访问。
+    if (maintenance_mode() && !in_array($route, ['auth.login', 'auth.logout', 'auth.me'], true)) {
+        $viewer = current_user();
+        if (!$viewer || empty($viewer['is_admin'])) {
+            throw new ApiException('站点正在闭站维护，目前仅管理员可以进入', 503, 'MAINTENANCE');
+        }
+    }
     $data = call_user_func($routes[$route]);
     ok_response($data === null ? new stdClass() : $data);
 } catch (ApiException $e) {

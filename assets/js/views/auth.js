@@ -11,10 +11,12 @@ function redirectTo(params) {
 }
 
 export function renderLogin(params) {
+  const maintenance = session.maintenanceMode;
   return `
     <div style="max-width:420px;margin:20px auto">
       <div class="card">
         <h2 style="margin-bottom:14px">登录</h2>
+        ${maintenance ? '<div class="notice maintenance-notice"><b>站点正在闭站维护</b><br><span class="small">维护期间仅管理员可以登录进入。</span></div>' : ''}
         <form id="login-form">
           <div class="field">
             <label>邮箱</label>
@@ -26,9 +28,9 @@ export function renderLogin(params) {
           </div>
           <button class="btn btn-primary" type="submit" style="width:100%">登录</button>
         </form>
-        <div class="divider"></div>
-        <div class="small muted">还没有账号？<a href="#/register">立即注册</a></div>
-        <div class="small muted" style="margin-top:6px">演示账号：demo@hz.example / 123456</div>
+        ${maintenance ? '' : `
+          <div class="divider"></div>
+          <div class="small muted">还没有账号？<a href="#/register">立即注册</a></div>`}
       </div>
     </div>
   `;
@@ -50,11 +52,14 @@ export function mountLogin(root, params) {
 }
 
 export function renderRegister(params) {
+  if (session.maintenanceMode) {
+    return `<div class="card">${emptyHTML('站点正在闭站维护', '维护期间暂停注册，仅管理员可以登录。')}<div style="text-align:center;padding-bottom:16px"><a class="btn btn-primary" href="#/login">管理员登录</a></div></div>`;
+  }
   return `
     <div style="max-width:460px;margin:20px auto">
       <div class="card">
         <h2 style="margin-bottom:4px">注册</h2>
-        <p class="muted small">注册后才可以评分、发帖和添加课程。</p>
+        <p class="muted small">注册并通过学生认证后可以评分和发帖；添加课程还需管理员单独授权。</p>
         <form id="register-form">
           <div class="field">
             <label>邮箱 *</label>

@@ -8,16 +8,6 @@
  * 注意：ES Module 的子模块（views/*.js）由 app.js 里的 import 加载，不带版本参数，
  *      所以服务端还要把 /assets/ 下的 js、css 配成协商缓存（见 deploy/nginx-site.conf）。
  */
-require_once __DIR__ . '/lib.php';
-require_once __DIR__ . '/maintenance.php';
-header('Cache-Control: no-store');
-$__maintenance = maintenance_state();
-if ($__maintenance['enabled'] && !maintenance_admin() && !isset($_GET['admin'])) {
-    http_response_code(503);
-    header('Retry-After: 3600');
-    require __DIR__ . '/maintenance-page.php';
-    exit;
-}
 $__assetVersion = '';
 $__cfgFile = __DIR__ . '/config.php';
 if (is_file($__cfgFile)) {
@@ -41,7 +31,6 @@ if ($__assetVersion === '') {
     }
     $__assetVersion = $__newest ? date('YmdHis', $__newest) : '1';
 }
-$__assetVersion .= '-maintenance-1';
 ?><!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -58,8 +47,8 @@ $__assetVersion .= '-maintenance-1';
       <nav class="main-nav">
         <a href="#/courses">找课</a>
         <a href="#/chat">友邻</a>
-        <a href="#/new-course">添加课程</a>
-        <a href="#/import">批量导入</a>
+        <a href="#/new-course" data-course-upload hidden>添加课程</a>
+        <a href="#/import" data-course-upload hidden>批量导入</a>
       </nav>
       <form class="header-search" id="header-search">
         <input type="search" name="q" placeholder="搜课程 / 老师 / 课号" autocomplete="off" />

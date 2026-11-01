@@ -36,7 +36,7 @@ export async function renderHome() {
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <a class="btn btn-primary" href="#/courses">开始找课</a>
-        <a class="btn" href="#/new-course">添加课程</a>
+        ${session.user && session.user.canUploadCourses ? '<a class="btn" href="#/new-course">添加课程</a>' : ''}
         <a class="btn" href="#/chat">去友邻聊聊</a>
       </div>
     </section>
@@ -74,10 +74,11 @@ export async function renderHome() {
         </div>
         <div class="card">
           <div class="card-title"><h3>共建入口</h3></div>
-          <p class="small muted" style="margin-bottom:10px">${session.user ? `欢迎回来，${esc(session.user.nickname)}` : '登录后可以添加课程、评分和发帖'}</p>
+          <p class="small muted" style="margin-bottom:10px">${session.user ? `欢迎回来，${esc(session.user.nickname)}` : '登录并完成认证后可以评分和发帖'}</p>
           <div style="display:flex;flex-direction:column;gap:8px">
-            <a class="btn" href="#/new-course">添加一门课程</a>
-            <a class="btn" href="#/import">CSV 批量导入</a>
+            ${session.user && session.user.canUploadCourses ? `
+              <a class="btn" href="#/new-course">添加一门课程</a>
+              <a class="btn" href="#/import">CSV 批量导入</a>` : '<span class="small muted">课程上传需要管理员单独授权。</span>'}
           </div>
         </div>
       </aside>

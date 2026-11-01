@@ -1,9 +1,6 @@
 /config.php
 /install.lock
 /.user.ini
-/maintenance-state.php
-/maintenance-state.php.*
-/.maintenance-*
 /uploads/*
 !/uploads/index.html
 !/uploads/verify/
@@ -14,5 +11,5 @@
 .env
 .env.*
 
-# 演示账号和内容数据
+# 演示账号和内容仅用于本地/部署环境，不发布到公共仓库
 /modules/seed.json

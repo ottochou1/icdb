@@ -315,6 +315,7 @@ table.data th { color: var(--muted); font-weight: 600; }
 .notice.ok { border-left-color: var(--brand); background: var(--brand-soft); }
 .notice.error { border-left-color: var(--danger); background: #fdf2f2; }
 .notice.pending { border-left-color: var(--star); background: #fff8ee; }
+.maintenance-notice { border-left-color: var(--danger); background: #fdf2f2; margin-bottom: 14px; }
 .notice + form { margin-top: 14px; }
 
 /* ---------- 文件选择预览 ---------- */
@@ -328,7 +329,7 @@ table.data th { color: var(--muted); font-weight: 600; }
 .file-chip .ok-tag { color: var(--brand); font-weight: 600; }
 
 /* ---------- 页签 ---------- */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
 .tab { padding: 8px 14px; border-bottom: 2px solid transparent; color: var(--muted); font-weight: 600; }
 .tab:hover { color: var(--brand); text-decoration: none; }
 .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
@@ -379,6 +380,11 @@ table.data th { color: var(--muted); font-weight: 600; }
 .status-tag.approved { background: var(--brand-soft); border-color: #cfe4d8; color: var(--brand); }
 .status-tag.rejected { background: #fdf2f2; border-color: #e8c4c7; color: var(--danger); }
 .status-tag.admin { background: #eef2fb; border-color: #ccd8ee; color: #3d6ea8; }
+
+body.maintenance-lock .main-nav,
+body.maintenance-lock .header-search,
+body.maintenance-lock .site-footer { display: none; }
+body.maintenance-lock .header-inner { justify-content: space-between; }
 
 /* ---------- 课程代码（可多个） ---------- */
 .course-code-row {

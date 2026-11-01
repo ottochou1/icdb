@@ -626,6 +626,44 @@ function require_admin()
     return $user;
 }
 
+/** 需要管理员明确授予课程上传权限；管理员始终拥有该权限。 */
+function require_course_uploader()
+{
+    $user = require_verified();
+    if (empty($user['is_admin']) && empty($user['can_upload_courses'])) {
+        throw new ApiException('课程上传权限需要管理员单独授权', 403, 'NO_COURSE_UPLOAD_PERMISSION');
+    }
+    return $user;
+}
+
+/** 读取站点设置。升级前 settings 表不存在时安全回落到默认值。 */
+function setting_get($key, $default = '')
+{
+    try {
+        return (string) q_val(
+            'SELECT setting_value FROM ' . t('settings') . ' WHERE setting_key = ? LIMIT 1',
+            [(string) $key],
+            $default
+        );
+    } catch (Throwable $e) {
+        return (string) $default;
+    }
+}
+
+function setting_set($key, $value)
+{
+    q(
+        'INSERT INTO ' . t('settings') . ' (setting_key, setting_value, updated_at) VALUES (?,?,?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at)',
+        [(string) $key, (string) $value, now_ms()]
+    );
+}
+
+function maintenance_mode()
+{
+    return setting_get('maintenance_mode', '0') === '1';
+}
+
 function get_user($id)
 {
     static $cache = [];
@@ -660,6 +698,7 @@ function public_user($row, $self = false)
         $out['studentId'] = (string) $row['student_id'];
         $out['banReason'] = (string) ($row['ban_reason'] ?? '');
         $out['canPost'] = can_participate($row);
+        $out['canUploadCourses'] = !empty($row['is_admin']) || !empty($row['can_upload_courses']);
     }
     return $out;
 }

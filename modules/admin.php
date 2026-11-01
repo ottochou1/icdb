@@ -15,7 +15,23 @@ function h_admin_stats()
         'posts' => (int) q_val('SELECT COUNT(*) FROM ' . t('posts')),
         'comments' => (int) q_val('SELECT COUNT(*) FROM ' . t('comments')),
         'banned' => (int) q_val('SELECT COUNT(*) FROM ' . t('users') . ' WHERE banned = 1'),
+        'courseUploaders' => (int) q_val('SELECT COUNT(*) FROM ' . t('users') . ' WHERE can_upload_courses = 1 OR is_admin = 1'),
+        'maintenanceMode' => maintenance_mode(),
     ];
+}
+
+function h_admin_maintenance()
+{
+    require_admin();
+    return ['maintenanceMode' => maintenance_mode()];
+}
+
+function h_admin_maintenance_update()
+{
+    require_admin();
+    $enabled = param_bool('enabled');
+    setting_set('maintenance_mode', $enabled ? '1' : '0');
+    return ['maintenanceMode' => $enabled];
 }
 
 function h_admin_verifications()
@@ -176,11 +192,17 @@ function h_admin_user_update()
     $isAdminRaw = param_raw('isAdmin');
     $verifiedRaw = param_raw('verified');
     $bannedRaw = param_raw('banned');
+    $canUploadRaw = param_raw('canUploadCourses');
     $banReason = mb_substr(trim((string) param_raw('banReason', '')), 0, 200);
 
-    $isAdmin = filter_var($isAdminRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    $verified = filter_var($verifiedRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    $banned = filter_var($bannedRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    // param_raw() 对未提交字段返回 null；必须保留 null，不能让 filter_var(null) 误变成 false。
+    $optionalBool = function ($raw) {
+        return $raw === null ? null : filter_var($raw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    };
+    $isAdmin = $optionalBool($isAdminRaw);
+    $verified = $optionalBool($verifiedRaw);
+    $banned = $optionalBool($bannedRaw);
+    $canUpload = $optionalBool($canUploadRaw);
 
     // 不允许把自己降级或封禁，避免后台把自己锁死
     if ($id === $admin['id']) {
@@ -210,6 +232,10 @@ function h_admin_user_update()
         $sets[] = 'ban_reason = ?';
         $params[] = $banned ? $banReason : '';
     }
+    if ($canUpload !== null) {
+        $sets[] = 'can_upload_courses = ?';
+        $params[] = $canUpload ? 1 : 0;
+    }
     if (!$sets) {
         throw new ApiException('没有需要更新的内容');
     }
@@ -228,6 +254,18 @@ function h_admin_user_update()
             q('UPDATE ' . t('verifications') . ' SET status = ?, admin_note = ?, reviewer_id = ?, reviewed_at = ? WHERE id = ?',
                 ['approved', '管理员手动认证', $admin['id'], now_ms(), $app['id']]);
         }
+    }
+
+    if ($canUpload !== null && empty($updated['is_admin'])) {
+        notify_user(
+            $id,
+            $canUpload ? '已获得课程上传权限' : '课程上传权限已被收回',
+            $canUpload
+                ? '管理员已允许你添加和批量导入课程。该权限仍需在学生认证有效且账号未被限制时使用。'
+                : '管理员已收回你的课程上传权限。已有课程与评价不会受影响。',
+            $canUpload ? '#/new-course' : '#/courses',
+            'permission'
+        );
     }
 
     return ['user' => public_user(get_user($id), true)];

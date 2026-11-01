@@ -2,10 +2,36 @@
 import { api } from './api.js';
 import { esc, avatarHTML, toast } from './util.js';
 
-export const session = { user: null, config: null, unread: { notifications: 0, messages: 0, total: 0 } };
+export const session = {
+  user: null,
+  config: null,
+  maintenanceMode: false,
+  unread: { notifications: 0, messages: 0, total: 0 },
+};
+
+export function syncAccessUI() {
+  const maintenanceLocked = session.maintenanceMode && (!session.user || !session.user.isAdmin);
+  document.body.classList.toggle('maintenance-lock', maintenanceLocked);
+  const canUpload = !!(session.user && session.user.canUploadCourses);
+  document.querySelectorAll('[data-course-upload]').forEach((el) => {
+    el.hidden = !canUpload;
+  });
+}
+
+export function setMaintenanceMode(enabled) {
+  session.maintenanceMode = !!enabled;
+  syncAccessUI();
+  renderHeader();
+}
+
+window.addEventListener('site-maintenance-lock', () => {
+  setMaintenanceMode(true);
+  if (location.hash !== '#/login') location.hash = '#/login';
+});
 
 export function setUser(user) {
   session.user = user;
+  syncAccessUI();
   renderHeader();
   refreshUnread().then(renderHeader);
 }
@@ -71,7 +97,10 @@ export async function refreshUnread() {
 export function renderHeader() {
   const box = document.getElementById('user-area');
   if (!box) return;
-  if (session.user) {
+  const maintenanceLocked = session.maintenanceMode && (!session.user || !session.user.isAdmin);
+  if (maintenanceLocked) {
+    box.innerHTML = '<span class="status-tag rejected">闭站维护中</span>';
+  } else if (session.user) {
     const u = session.user;
     const unread = session.unread || { total: 0 };
     const badge = unread.total > 0
@@ -117,9 +146,11 @@ export async function bootstrapSession() {
   try {
     const data = await api.me();
     session.user = data.user;
+    session.maintenanceMode = !!data.maintenanceMode;
     await refreshUnread();
   } catch {
     session.user = null;
   }
+  syncAccessUI();
   renderHeader();
 }

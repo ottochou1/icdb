@@ -377,6 +377,8 @@ export async function renderCourseForm(params, id) {
     }
   } else if (!session.user) {
     return `<div class="card">${emptyHTML('登录后才能添加课程')}<div style="text-align:center;padding-bottom:16px"><a class="btn btn-primary" href="#/login">去登录</a></div></div>`;
+  } else if (!session.user.canUploadCourses) {
+    return `<div class="card">${emptyHTML('尚未获得课程上传权限', '即使已通过在读认证，仍需管理员在用户管理中单独授权。')}<div style="text-align:center;padding-bottom:16px"><a class="btn" href="#/courses">返回课程列表</a></div></div>`;
   }
 
   const c = course || {};
@@ -450,6 +452,9 @@ const SAMPLE = '课程名称,老师,课程代码,学分,开课学院,课程类�
 export async function renderImport() {
   if (!session.user) {
     return `<div class="card">${emptyHTML('登录后才能批量导入课程')}<div style="text-align:center;padding-bottom:16px"><a class="btn btn-primary" href="#/login">去登录</a></div></div>`;
+  }
+  if (!session.user.canUploadCourses) {
+    return `<div class="card">${emptyHTML('尚未获得课程上传权限', '批量导入同样需要管理员单独授权。')}<div style="text-align:center;padding-bottom:16px"><a class="btn" href="#/courses">返回课程列表</a></div></div>`;
   }
   return `
     <div class="breadcrumb"><a href="#/">首页</a> / 批量导入</div>

@@ -18,7 +18,7 @@ function apiUrl(route, params = {}) {
 }
 
 /** 统一处理响应，把后端的机器可读错误码挂到 error.code 上 */
-async function unwrap(res) {
+async function unwrap(res, route = '') {
   let payload;
   try {
     payload = await res.json();
@@ -26,10 +26,12 @@ async function unwrap(res) {
     throw new Error('服务器返回异常，请检查 PHP 与数据库配置');
   }
   if (!payload.ok) {
-    if (payload.code === 'MAINTENANCE') window.dispatchEvent(new Event('site-maintenance'));
     const err = new Error(payload.error || '请求失败');
     err.code = payload.code || '';
     err.status = res.status;
+    if (err.code === 'MAINTENANCE' && route !== 'auth.login') {
+      window.dispatchEvent(new CustomEvent('site-maintenance-lock'));
+    }
     throw err;
   }
   return payload.data;
@@ -42,7 +44,7 @@ async function request(method, route, { params = {}, body = null } = {}) {
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'same-origin',
   });
-  return unwrap(res);
+  return unwrap(res, route);
 }
 
 /** 文件上传：交给浏览器自动设置 multipart 边界，不要手工指定 Content-Type */
@@ -52,7 +54,7 @@ async function requestForm(route, formData, params = {}) {
     body: formData,
     credentials: 'same-origin',
   });
-  return unwrap(res);
+  return unwrap(res, route);
 }
 
 export const api = {
@@ -106,9 +108,6 @@ export const api = {
   readNotifications: (id) => request('POST', 'notifications.read', { body: id ? { id } : {} }),
 
   /* 管理后台 */
-  maintenanceStatus: () => request('GET', 'maintenance.status'),
-  adminMaintenance: () => request('GET', 'admin.maintenance'),
-  updateMaintenance: async (body) => unwrap(await fetch(apiUrl('admin.maintenance.update'), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Maintenance-Request': '1' }, body: JSON.stringify(body) })),
   adminStats: () => request('GET', 'admin.stats'),
   adminVerifications: (status) => request('GET', 'admin.verifications', { params: { status } }),
   adminReview: (id, action, note) => request('POST', 'admin.verification.review', { body: { id, action, note } }),
@@ -123,6 +122,8 @@ export const api = {
   adminCourseMerge: (from, to) => request('POST', 'admin.course.merge', { body: { from, to } }),
   adminImportCourses: (formData, params) => requestForm('admin.courses.import', formData, params),
   adminImportEdu: (formData, params) => requestForm('admin.edu.import', formData, params),
+  adminMaintenance: () => request('GET', 'admin.maintenance'),
+  adminMaintenanceUpdate: (enabled) => request('POST', 'admin.maintenance.update', { body: { enabled } }),
   exportCourses: () => request('GET', 'courses.export', {}),
 };
 

@@ -243,7 +243,7 @@ function h_courses_get()
 
 function h_courses_create()
 {
-    $user = require_verified();
+    $user = require_course_uploader();
     $name = param_str('name', '', 80);
     $teacher = param_str('teacher', '', 40);
     $code = param_str('code', '', 32);
@@ -360,7 +360,7 @@ function h_courses_delete()
 
 function h_courses_import()
 {
-    $user = require_verified();
+    $user = require_course_uploader();
     $csv = (string) param_raw('csv', '');
     $rows = csv_to_courses($csv);
     if (!$rows) {

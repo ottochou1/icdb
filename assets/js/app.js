@@ -1,15 +1,13 @@
 /** 路由与页面装配 */
-import { api } from './api.js?v=maintenance-1';
-import { session } from './session.js';
 import { esc } from './util.js';
-import { bootstrapSession, setReload, renderHeader } from './session.js';
+import { bootstrapSession, setReload, renderHeader, session, syncAccessUI } from './session.js';
 import * as home from './views/home.js';
 import * as courses from './views/courses.js';
 import * as forum from './views/forum.js';
 import * as auth from './views/auth.js';
 import * as verify from './views/verify.js';
 import * as messages from './views/messages.js';
-import * as admin from './views/admin.js?v=maintenance-1';
+import * as admin from './views/admin.js';
 
 const routes = [
   { re: /^\/?$/, render: home.renderHome, mount: home.mountHome, nav: '/' },
@@ -51,18 +49,13 @@ async function renderRoute() {
   const app = document.getElementById('app');
   const { path, params } = parseHash();
 
-  try {
-    const state = await api.maintenanceStatus();
-    if (state.enabled && !session.user?.isAdmin && path !== '/login') {
-      app.innerHTML = `<div class="card" style="max-width:520px;margin:40px auto"><h1>网站维护中</h1><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(state.message)}</p><a href="#/login">管理员登录</a></div>`;
-      rendering = false;
-      return;
-    }
-  } catch (err) {
-    app.innerHTML = `<div class="card">${esc(err.message || '无法读取网站状态，请稍后刷新')}</div>`;
+  if (session.maintenanceMode && (!session.user || !session.user.isAdmin) && path !== '/login') {
     rendering = false;
+    if (location.hash !== '#/login') location.hash = '#/login';
+    else renderRoute();
     return;
   }
+
   const matched = routes.map((r) => ({ r, m: path.match(r.re) })).find((x) => x.m);
   highlightNav(matched ? matched.r.nav : '');
 
@@ -91,7 +84,6 @@ async function renderRoute() {
 }
 
 function bindGlobal() {
-  window.addEventListener('site-maintenance', () => location.reload());
   const form = document.getElementById('header-search');
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -103,6 +95,7 @@ function bindGlobal() {
 
 (async function start() {
   await bootstrapSession();
+  syncAccessUI();
   renderHeader();
   setReload(renderRoute);
   bindGlobal();

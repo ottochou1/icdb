@@ -76,12 +76,32 @@ if (!$isCli) {
 }
 
 $users = upgrade_table('users');
+$settings = upgrade_table('settings');
 $verifications = upgrade_table('verifications');
 $notifications = upgrade_table('notifications');
 $conversations = upgrade_table('conversations');
 $messages = upgrade_table('messages');
 $courses = upgrade_table('courses');
 $courseCodes = upgrade_table('course_codes');
+
+run_step('users.can_upload_courses（课程上传授权）', function () use ($users) {
+    return add_column_if_missing($users, 'can_upload_courses', "TINYINT(1) NOT NULL DEFAULT 0 AFTER is_admin");
+});
+
+run_step('表 settings（站点设置）', function () use ($settings) {
+    if (table_exists($settings)) {
+        return false;
+    }
+    db()->exec(
+        'CREATE TABLE `' . $settings . '` (
+            setting_key VARCHAR(64) NOT NULL,
+            setting_value TEXT NOT NULL,
+            updated_at BIGINT NOT NULL DEFAULT 0,
+            PRIMARY KEY (setting_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+    return true;
+});
 
 run_step('users.verified（是否已通过学生认证）', function () use ($users) {
     return add_column_if_missing($users, 'verified', "TINYINT(1) NOT NULL DEFAULT 0 AFTER is_admin");

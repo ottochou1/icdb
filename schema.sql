@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `{{PREFIX}}users` (
   `bio` varchar(300) NOT NULL DEFAULT '',
   `avatar_color` varchar(16) NOT NULL DEFAULT '#2f7d51',
   `is_admin` tinyint(1) NOT NULL DEFAULT 0,
+  `can_upload_courses` tinyint(1) NOT NULL DEFAULT 0,
   `verified` tinyint(1) NOT NULL DEFAULT 0,
   `verified_at` bigint NOT NULL DEFAULT 0,
   `banned` tinyint(1) NOT NULL DEFAULT 0,
@@ -20,6 +21,14 @@ CREATE TABLE IF NOT EXISTS `{{PREFIX}}users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_users_email` (`email`),
   UNIQUE KEY `uk_users_nickname` (`nickname`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 站点级设置（例如闭站维护开关）
+CREATE TABLE IF NOT EXISTS `{{PREFIX}}settings` (
+  `setting_key` varchar(64) NOT NULL,
+  `setting_value` text NOT NULL,
+  `updated_at` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `{{PREFIX}}courses` (
