@@ -1,0 +1,84 @@
+<?php
+/**
+ * 页面外壳（前端为 hash 路由，所有页面都由本文件输出）
+ *
+ * 下面这段算的是静态资源版本戳：有了它，改完前端代码上传后浏览器 / CDN 才会去拉新文件。
+ * 优先级：config.php 里的 asset_version（发布时手工改，最可控）
+ *         → 没配就自动取 assets/ 目录下所有文件的最新修改时间（上传即生效）。
+ * 注意：ES Module 的子模块（views/*.js）由 app.js 里的 import 加载，不带版本参数，
+ *      所以服务端还要把 /assets/ 下的 js、css 配成协商缓存（见 deploy/nginx-site.conf）。
+ */
+$__assetVersion = '';
+$__cfgFile = __DIR__ . '/config.php';
+if (is_file($__cfgFile)) {
+    $__cfg = require $__cfgFile;
+    if (is_array($__cfg) && !empty($__cfg['asset_version'])) {
+        $__assetVersion = (string) $__cfg['asset_version'];
+    }
+}
+if ($__assetVersion === '') {
+    $__newest = 0;
+    $__base = __DIR__ . '/assets';
+    if (is_dir($__base)) {
+        $__it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($__base, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($__it as $__f) {
+            if ($__f->isFile() && $__f->getMTime() > $__newest) {
+                $__newest = $__f->getMTime();
+            }
+        }
+    }
+    $__assetVersion = $__newest ? date('YmdHis', $__newest) : '1';
+}
+?><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>华政ICDB · 华东政法大学课程数据库</title>
+  <meta name="description" content="华政ICDB：由华东政法大学学生共同维护的课程数据库，提供课程检索、评分、短评与选课讨论。" />
+  <link rel="stylesheet" href="assets/style.css?v=<?= $__assetVersion ?>" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="logo" href="#/" aria-label="华政ICDB首页">
+        <b>华政ICDB</b>
+        <small>ECUPL COURSE DATABASE</small>
+      </a>
+      <nav class="main-nav">
+        <a href="#/courses">课程库</a>
+        <a href="#/chat">友邻社区</a>
+        <a href="#/new-course" data-course-upload hidden>添加课程</a>
+        <a href="#/import" data-course-upload hidden>批量导入</a>
+      </nav>
+      <form class="header-search" id="header-search">
+        <input type="search" name="q" placeholder="搜课程 / 老师 / 课号" autocomplete="off" />
+        <button type="submit">搜索</button>
+      </form>
+      <div class="user-area" id="user-area"></div>
+    </div>
+  </header>
+
+  <main id="app" class="wrap"></main>
+
+  <nav class="mobile-bottom" aria-label="移动端导航">
+    <a href="#/" data-mobile-nav="/"><span>⌂</span><b>首页</b></a>
+    <a href="#/courses" data-mobile-nav="/courses"><span>⌕</span><b>课程库</b></a>
+    <a href="#/chat" data-mobile-nav="/chat"><span>◌</span><b>友邻</b></a>
+    <a href="#/me" data-mobile-nav="/me"><span>○</span><b>我的</b></a>
+  </nav>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>华政ICDB · 由学生共建的华政课程数据库</p>
+      <p class="muted">评分与言论仅代表发布者个人体验，请理性参考。</p>
+    </div>
+  </footer>
+
+  <div id="toast-box" class="toast-box"></div>
+
+  <script type="module" src="assets/js/app.js?v=<?= $__assetVersion ?>"></script>
+</body>
+</html>
